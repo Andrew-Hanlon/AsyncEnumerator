@@ -1,10 +1,6 @@
 ﻿using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
 using System.Reactive.Subjects;
 using System.Runtime.CompilerServices;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace AsyncEnumerator
@@ -15,7 +11,9 @@ namespace AsyncEnumerator
     {
         #region Fields
 
-        private readonly AsyncSubject<T> _subject = new AsyncSubject<T>();
+        private readonly Subject<T> _subject = new Subject<T>();
+
+        private TaskCompletionSource<bool> _subscribeTask = new TaskCompletionSource<bool>();
 
         #endregion
 
@@ -24,6 +22,8 @@ namespace AsyncEnumerator
         public bool IsCompleted { get; internal set; }
 
         public T Result { get; internal set; }
+
+        public Task Subscription => _subscribeTask.Task;
 
         public static TaskLikeObservableProvider Capture() => TaskLikeObservableProvider.Instance;
 
@@ -79,7 +79,14 @@ namespace AsyncEnumerator
             }
         }
 
-        public IDisposable Subscribe(IObserver<T> observer) => _subject.Subscribe(observer);
+        public IDisposable Subscribe(IObserver<T> observer)
+        {
+            var ret = _subject.Subscribe(observer);
+
+            _subscribeTask.TrySetResult(true);
+
+            return ret;
+        }
 
         void ITaskLikeSubject<T>.OnNext(T value)
         {
@@ -101,6 +108,7 @@ namespace AsyncEnumerator
         void OnNext(T value);
 
         T OnCompleted();
+        Task Subscription { get; }
     }
 
     public struct TaskLikeObservableMethodBuilder<T>

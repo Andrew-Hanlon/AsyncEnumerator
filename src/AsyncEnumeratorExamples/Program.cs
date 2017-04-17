@@ -1,9 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-using System.Reactive.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using AsyncEnumerator;
 
@@ -20,27 +15,21 @@ namespace AsyncEnumeratorExamples
 
         public static async Task Consumer()
         {
-            //var p = Producer();
+            var p = Producer();
 
-            //while (await p.MoveNext())
-            //{
-            //    Console.WriteLine(p.Current);
-            //}
-
-            var p2 = Producer2();
-
-            p2.Subscribe(o =>
+            while (await p.MoveNext())
             {
-                Console.WriteLine(o);
-                //await Task.Delay(100);
-            });
+                Console.WriteLine(p.Current);
+            }
+
+            Producer2().Subscribe(Console.WriteLine);
         }
 
         public static async AsyncEnumerator<string> Producer()
         {
             var e = await AsyncEnumerator<string>.Capture();
 
-            for (int i = 0; i < 10; i++)
+            for (var i = 0; i < 10; i++)
             {
                 e.Yield("y" + i);
 
@@ -54,7 +43,9 @@ namespace AsyncEnumeratorExamples
         {
             var e = await TaskLikeObservable<string>.Capture();
 
-            for (int i = 0; i < 10; i++)
+            await e.Subscription;
+
+            for (var i = 0; i < 10; i++)
             {
                 e.OnNext("y" + i);
 

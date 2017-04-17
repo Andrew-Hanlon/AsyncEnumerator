@@ -58,12 +58,12 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AsyncCoopEnumerator.cs" />
-    <Compile Include="AsyncEnumerator - Copy.cs" />
     <Compile Include="AsyncEnumerator.cs" />
     <Compile Include="AsyncMethodBuilderAttribute.cs" />
     <Compile Include="IAsyncEnumerator.cs" />
     <Compile Include="IAsyncCoopEnumeratorProducer.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="TaskLikeObservable.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
