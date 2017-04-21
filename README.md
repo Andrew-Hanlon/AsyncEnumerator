@@ -28,7 +28,7 @@ public static async AsyncEnumerator<int> Producer()
 {
     var e = await AsyncEnumerator<int>.Capture(); // Capture the underlying 'Task'
 
-    await e.Yield();                              // Optionally wait for first MoveNext call
+    await e.YieldInit();                          // Optionally wait for first MoveNext call
 
     await e.Yield(1);                             // Yield the value and wait for MoveNext
                    
