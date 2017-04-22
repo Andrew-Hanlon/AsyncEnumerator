@@ -68,9 +68,9 @@
     <Reference Include="WindowsBase" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="AsyncEnumeratorTests - Copy.cs" />
+    <Compile Include="TaskLikeObservableTests.cs" />
+    <Compile Include="AsyncParallelEnumeratorTests.cs" />
     <Compile Include="AsyncEnumeratorTests.cs" />
-    <Compile Include="AsyncCoopEnumeratorTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

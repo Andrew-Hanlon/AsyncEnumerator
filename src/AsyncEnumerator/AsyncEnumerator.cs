@@ -1,106 +1,130 @@
 ﻿using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Text;
+using System.Runtime.ExceptionServices;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 
 namespace AsyncEnumerator
 {
+    public interface IAsyncEnumeratorProducer<T>
+    {
+        Task Yield(T value);
+        Task YieldInit();
+        T YieldReturn();
+    }
+
     [AsyncMethodBuilder(typeof(AsyncEnumeratorMethodBuilder<>))]
     public class AsyncEnumerator<T>
-        : IAsyncEnumeratorProducer<T>, IAsyncEnumerator<T>
+        : IAsyncEnumeratorProducer<T>, IAsyncEnumerator<T>, ITaskLike
     {
-        #region Fields
-
-        private TaskCompletionSource<bool> _nextSource;
-
-        private readonly ConcurrentQueue<T> _valueQueue = new ConcurrentQueue<T>();
-
-        #endregion
-
         public T Current { get; internal set; }
 
-        public bool IsCompleted { get; internal set; }
-
-        public T Result { get; internal set; }
-
-        public static AsyncEnumeratorProvider Capture() => AsyncEnumeratorProvider.Instance;
-
-        private readonly object _lock = new object();
-
-        public async Task<bool> MoveNext()
+        public Task<bool> MoveNext()
         {
-            if (_valueQueue.TryDequeue(out var value))
-            {
-                Current = value;
-                return true;
-            }
+            _exception?.Throw();
 
-            if (IsCompleted)
-                return false;
+            if (!_isStarted)
+            {
+                _isStarted = true;
+                return Task.FromResult(true);
+            }
 
             _nextSource = new TaskCompletionSource<bool>();
 
-            await _nextSource.Task;
+            _yieldSource?.TrySetResult(true);
 
-            if (_valueQueue.TryDequeue(out value))
-            {
-                Current = value;
-                return true;
-            }
+            if (_yieldSource == null)
+                return Task.FromResult(true);
 
-            if (IsCompleted)
-                return false;
-
-            return true;
+            return _nextSource.Task;
         }
 
-        void IAsyncEnumeratorProducer<T>.Yield(T value)
+        Task IAsyncEnumeratorProducer<T>.Yield(T value)
         {
-            _valueQueue.Enqueue(value);
+            Current = value;
+
+            _yieldSource = new TaskCompletionSource<bool>();
+
             _nextSource?.TrySetResult(true);
+
+            return _yieldSource.Task;
+        }
+
+        Task IAsyncEnumeratorProducer<T>.YieldInit()
+        {
+            _isStarted = true;
+            _yieldSource = new TaskCompletionSource<bool>();
+            return _yieldSource.Task;
         }
 
         T IAsyncEnumeratorProducer<T>.YieldReturn()
         {
-            IsCompleted = true;
-            _nextSource?.TrySetResult(false);
+            _nextSource.TrySetResult(false);
             return default(T);
         }
 
-        internal AsyncEnumeratorAwaiter GetAwaiter() => new AsyncEnumeratorAwaiter(this);
+        public bool IsCompleted { get; internal set; }
 
-        internal class AsyncEnumeratorAwaiter : INotifyCompletion
+        public TaskLikeAwaiterBase GetAwaiter()
         {
-            #region Fields
+            _exception?.Throw();
 
-            private readonly AsyncEnumerator<T> _task;
-            private TaskAwaiter _taskAwaiter;
+            return new AsyncEnumeratorAwaiter(this);
+        }
 
-            #endregion
+        public static TaskProvider Capture()
+        {
+            return TaskProvider.Instance;
+        }
 
+        public void SetException(ExceptionDispatchInfo exception)
+        {
+            _exception = exception;
+            _nextSource?.TrySetException(exception.SourceException);
+        }
+
+        internal void SetCompletion()
+        {
+            IsCompleted = true;
+        }
+
+        internal class AsyncEnumeratorAwaiter : TaskLikeAwaiterBase
+        {
             internal AsyncEnumeratorAwaiter(AsyncEnumerator<T> task)
             {
                 _task = task;
                 _taskAwaiter = new TaskAwaiter();
             }
 
-            internal bool IsCompleted => _task.IsCompleted;
+            public override bool IsCompleted => _task.IsCompleted;
 
-            public void OnCompleted(Action a) { _taskAwaiter.OnCompleted(a); }
+            public override void GetResult()
+            {
+            }
 
-            internal T GetResult() => _task.Result;
+            public override void OnCompleted(Action a)
+            {
+                _taskAwaiter.OnCompleted(a);
+            }
+
+            #region Fields
+
+            private readonly AsyncEnumerator<T> _task;
+            private TaskAwaiter _taskAwaiter;
+
+            #endregion
         }
 
-        public class AsyncEnumeratorProvider
+        public class TaskProvider
         {
-            public static readonly AsyncEnumeratorProvider Instance = new AsyncEnumeratorProvider();
+            public static readonly TaskProvider Instance = new TaskProvider();
 
-            public AsyncEnumeratorProviderAwaiter GetAwaiter() => new AsyncEnumeratorProviderAwaiter();
+            public TaskProviderAwaiter GetAwaiter()
+            {
+                return new TaskProviderAwaiter();
+            }
 
-            public class AsyncEnumeratorProviderAwaiter : INotifyCompletion
+            public class TaskProviderAwaiter : INotifyCompletion
             {
                 #region Fields
 
@@ -110,24 +134,43 @@ namespace AsyncEnumerator
 
                 public bool IsCompleted => _enumerator != null;
 
-                public IAsyncEnumeratorProducer<T> GetResult() => _enumerator;
+                public void OnCompleted(Action continuation)
+                {
+                    throw new InvalidOperationException(
+                        "OnCompleted override with asyncEnumerator param must be called.");
+                }
+
+                public IAsyncEnumeratorProducer<T> GetResult()
+                {
+                    return _enumerator;
+                }
 
                 public void OnCompleted(Action continuation, AsyncEnumerator<T> asyncEnumerator)
                 {
                     _enumerator = asyncEnumerator;
-                    Task.Run(continuation);
+                    continuation();
                 }
-
-                public void OnCompleted(Action continuation) => throw new InvalidOperationException("OnCompleted override with asyncEnumerator param must be called.");
             }
         }
+
+        #region Fields
+
+        private bool _isStarted;
+        private TaskCompletionSource<bool> _nextSource;
+        private TaskCompletionSource<bool> _yieldSource;
+        private ExceptionDispatchInfo _exception;
+
+        #endregion
     }
 
     public struct AsyncEnumeratorMethodBuilder<T>
     {
         private AsyncTaskMethodBuilder<T> _methodBuilder;
 
-        public static AsyncEnumeratorMethodBuilder<T> Create() => new AsyncEnumeratorMethodBuilder<T>(new AsyncEnumerator<T>());
+        public static AsyncEnumeratorMethodBuilder<T> Create()
+        {
+            return new AsyncEnumeratorMethodBuilder<T>(new AsyncEnumerator<T>());
+        }
 
         internal AsyncEnumeratorMethodBuilder(AsyncEnumerator<T> task)
         {
@@ -135,32 +178,39 @@ namespace AsyncEnumerator
             Task = task;
         }
 
-        public void SetStateMachine(IAsyncStateMachine stateMachine) { }
+        public void SetStateMachine(IAsyncStateMachine stateMachine)
+        {
+        }
 
         public void Start<TStateMachine>(ref TStateMachine stateMachine)
-            where TStateMachine : IAsyncStateMachine => stateMachine.MoveNext();
+            where TStateMachine : IAsyncStateMachine
+        {
+            stateMachine.MoveNext();
+        }
 
-        public void SetException(Exception e) => Task.IsCompleted = true;
+        public void SetException(Exception ex)
+        {
+            Task.SetException(ExceptionDispatchInfo.Capture(ex));
+        }
 
         public void SetResult(T value)
         {
-            Task.Result = value;
-            Task.IsCompleted = true;
+            Task.SetCompletion();
+            ((IAsyncEnumeratorProducer<T>) Task).Yield(value);
         }
 
         public void AwaitOnCompleted<TAwaiter, TStateMachine>(ref TAwaiter awaiter, ref TStateMachine stateMachine)
             where TAwaiter : INotifyCompletion
             where TStateMachine : IAsyncStateMachine
         {
-            var provider = awaiter as AsyncEnumerator<T>.AsyncEnumeratorProvider.AsyncEnumeratorProviderAwaiter;
-
-            if (provider is null)
-                _methodBuilder.AwaitOnCompleted(ref awaiter, ref stateMachine);
-            else
+            if ((INotifyCompletion) awaiter is AsyncEnumerator<T>.TaskProvider.TaskProviderAwaiter provider)
                 provider.OnCompleted(((IAsyncStateMachine) stateMachine).MoveNext, Task);
+            else
+                _methodBuilder.AwaitOnCompleted(ref awaiter, ref stateMachine);
         }
 
-        public void AwaitUnsafeOnCompleted<TAwaiter, TStateMachine>(ref TAwaiter awaiter, ref TStateMachine stateMachine)
+        public void AwaitUnsafeOnCompleted<TAwaiter, TStateMachine>(ref TAwaiter awaiter,
+            ref TStateMachine stateMachine)
             where TAwaiter : ICriticalNotifyCompletion
             where TStateMachine : IAsyncStateMachine
         {

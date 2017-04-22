@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Reactive.Linq;
-using System.Reactive.Subjects;
-using System.Threading.Tasks;
 using AsyncEnumerator;
 using Microsoft.Reactive.Testing;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -13,7 +11,7 @@ namespace AsyncEnumeratorTests
     public class TaskLikeObservableTests
     {
         [TestMethod]
-        public async Task SequenceRunsCorrectly()
+        public void SequenceRunsCorrectly()
         {
             var sched = new TestScheduler();
             var results = new List<int>();
