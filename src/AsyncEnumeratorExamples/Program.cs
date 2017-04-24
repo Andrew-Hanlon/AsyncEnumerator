@@ -9,33 +9,39 @@ namespace AsyncEnumeratorExamples
     {
         static void Main(string[] args)
         {
+            MainAsync().GetAwaiter().GetResult();
+        }
+
+        public static async Task MainAsync()
+        {
             Console.WriteLine("AsyncEnumerator:");
-            Consumer().GetAwaiter().GetResult();
+            await Consumer();
 
             Console.WriteLine("\nAsyncParallelEnumerator:");
-            Consumer2().GetAwaiter().GetResult();
+            await Consumer2();
 
             Console.WriteLine("\nTaskLikeObservable:");
-            Consumer3().GetAwaiter().GetResult();
+            await Consumer3();
 
-            Console.ReadKey();
+            Console.WriteLine("\nPress any key to exit.");
+            Console.ReadKey(true);
         }
 
         public static async AsyncEnumerator<int> Producer()
         {
-            var e = await AsyncEnumerator<int>.Capture(); // Capture the underlying 'Task'
+            var yield = await AsyncEnumerator<int>.Capture(); // Capture the underlying 'Task'
 
-            await e.YieldInit();                          // Optionally Wait for first MoveNext call
+            await yield.Pause();                          // Optionally Wait for first MoveNext call
 
             await Task.Delay(100).ConfigureAwait(false);  // Use any async constructs
 
-            await e.Yield(1);                             // Yield a value and wait for MoveNext
+            await yield.Return(1);                        // Yield a value and wait for MoveNext
 
             await Task.Delay(100);
 
-            await e.Yield(2);
+            await yield.Return(2);
 
-            return e.YieldReturn();                       // Return false to awaiting MoveNext
+            return yield.Break();                       // Return false to awaiting MoveNext
         }
 
         public static async Task Consumer()
@@ -59,23 +65,23 @@ namespace AsyncEnumeratorExamples
             }
         }
 
-        public static async AsyncParallelEnumerator<int> Producer2()
+        public static async AsyncSequence<int> Producer2()
         {
-            var e = await AsyncParallelEnumerator<int>.Capture(); // Capture the underlying 'Task'
+            var yield = await AsyncSequence<int>.Capture(); // Capture the underlying 'Task'
 
             await Task.Delay(100).ConfigureAwait(false);          // Use any async constructs
 
-            e.Yield(1);                                           // Yield the value and continue
+            yield.Return(1);                                      // Yield the value and continue
 
             await Task.Delay(100).ConfigureAwait(false);
 
-            e.Yield(2);
+            yield.Return(2);
 
             await Task.Delay(100).ConfigureAwait(false);
 
-            e.Yield(3);
+            yield.Return(3);
 
-            return e.YieldReturn();                               // Returns false to awaiting MoveNext
+            return yield.Break();                               // Returns false to awaiting MoveNext
         }
 
         public static Task Consumer3()
@@ -85,18 +91,18 @@ namespace AsyncEnumeratorExamples
 
         public static async TaskLikeObservable<string> Producer3()
         {
-            var e = await TaskLikeObservable<string>.Capture();
+            var o = await TaskLikeObservable<string>.Capture();
 
-            await e.Subscription;
+            await o.Subscription;
 
             for (var i = 0; i < 10; i++)
             {
-                e.OnNext("y" + i);
+                o.OnNext("y" + i);
 
                 await Task.Delay(100).ConfigureAwait(false);
             }
 
-            return e.OnCompleted();
+            return o.OnCompleted();
         }
     }
 }

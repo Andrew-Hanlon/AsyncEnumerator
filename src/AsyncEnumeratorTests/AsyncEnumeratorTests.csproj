@@ -69,7 +69,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="TaskLikeObservableTests.cs" />
-    <Compile Include="AsyncParallelEnumeratorTests.cs" />
+    <Compile Include="AsyncSequenceTests.cs" />
     <Compile Include="AsyncEnumeratorTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

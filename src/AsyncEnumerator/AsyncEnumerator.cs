@@ -8,14 +8,13 @@ namespace AsyncEnumerator
 {
     public interface IAsyncEnumeratorProducer<T>
     {
-        Task Yield(T value);
-        Task YieldInit();
-        T YieldReturn();
+        Task Return(T value);
+        Task Pause();
+        T Break();
     }
 
     [AsyncMethodBuilder(typeof(AsyncEnumeratorMethodBuilder<>))]
-    public class AsyncEnumerator<T>
-        : IAsyncEnumeratorProducer<T>, IAsyncEnumerator<T>, ITaskLike
+    public class AsyncEnumerator<T> : IAsyncEnumeratorProducer<T>, IAsyncEnumerator<T>, ITaskLike
     {
         public T Current { get; internal set; }
 
@@ -39,7 +38,7 @@ namespace AsyncEnumerator
             return _nextSource.Task;
         }
 
-        Task IAsyncEnumeratorProducer<T>.Yield(T value)
+        Task IAsyncEnumeratorProducer<T>.Return(T value)
         {
             Current = value;
 
@@ -50,14 +49,14 @@ namespace AsyncEnumerator
             return _yieldSource.Task;
         }
 
-        Task IAsyncEnumeratorProducer<T>.YieldInit()
+        Task IAsyncEnumeratorProducer<T>.Pause()
         {
             _isStarted = true;
             _yieldSource = new TaskCompletionSource<bool>();
             return _yieldSource.Task;
         }
 
-        T IAsyncEnumeratorProducer<T>.YieldReturn()
+        T IAsyncEnumeratorProducer<T>.Break()
         {
             _nextSource.TrySetResult(false);
             return default(T);
@@ -68,14 +67,10 @@ namespace AsyncEnumerator
         public TaskLikeAwaiterBase GetAwaiter()
         {
             _exception?.Throw();
-
             return new AsyncEnumeratorAwaiter(this);
         }
 
-        public static TaskProvider Capture()
-        {
-            return TaskProvider.Instance;
-        }
+        public static TaskProvider Capture() => TaskProvider.Instance;
 
         public void SetException(ExceptionDispatchInfo exception)
         {
@@ -83,10 +78,7 @@ namespace AsyncEnumerator
             _nextSource?.TrySetException(exception.SourceException);
         }
 
-        internal void SetCompletion()
-        {
-            IsCompleted = true;
-        }
+        internal void SetCompletion() => IsCompleted = true;
 
         internal class AsyncEnumeratorAwaiter : TaskLikeAwaiterBase
         {
@@ -98,14 +90,9 @@ namespace AsyncEnumerator
 
             public override bool IsCompleted => _task.IsCompleted;
 
-            public override void GetResult()
-            {
-            }
+            public override void GetResult(){}
 
-            public override void OnCompleted(Action a)
-            {
-                _taskAwaiter.OnCompleted(a);
-            }
+            public override void OnCompleted(Action a) => _taskAwaiter.OnCompleted(a);
 
             #region Fields
 
@@ -167,10 +154,7 @@ namespace AsyncEnumerator
     {
         private AsyncTaskMethodBuilder<T> _methodBuilder;
 
-        public static AsyncEnumeratorMethodBuilder<T> Create()
-        {
-            return new AsyncEnumeratorMethodBuilder<T>(new AsyncEnumerator<T>());
-        }
+        public static AsyncEnumeratorMethodBuilder<T> Create() => new AsyncEnumeratorMethodBuilder<T>(new AsyncEnumerator<T>());
 
         internal AsyncEnumeratorMethodBuilder(AsyncEnumerator<T> task)
         {
@@ -178,25 +162,17 @@ namespace AsyncEnumerator
             Task = task;
         }
 
-        public void SetStateMachine(IAsyncStateMachine stateMachine)
-        {
-        }
+        public void SetStateMachine(IAsyncStateMachine stateMachine){}
 
         public void Start<TStateMachine>(ref TStateMachine stateMachine)
-            where TStateMachine : IAsyncStateMachine
-        {
-            stateMachine.MoveNext();
-        }
+            where TStateMachine : IAsyncStateMachine => stateMachine.MoveNext();
 
-        public void SetException(Exception ex)
-        {
-            Task.SetException(ExceptionDispatchInfo.Capture(ex));
-        }
+        public void SetException(Exception ex) => Task.SetException(ExceptionDispatchInfo.Capture(ex));
 
         public void SetResult(T value)
         {
             Task.SetCompletion();
-            ((IAsyncEnumeratorProducer<T>) Task).Yield(value);
+            ((IAsyncEnumeratorProducer<T>) Task).Return(value);
         }
 
         public void AwaitOnCompleted<TAwaiter, TStateMachine>(ref TAwaiter awaiter, ref TStateMachine stateMachine)

@@ -6,7 +6,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 namespace AsyncEnumeratorTests
 {
     [TestClass]
-    public class AsyncEnumeratorTests
+    public class AsyncSequenceTests
     {
         [TestMethod]
         [ExpectedException(typeof(Exception), "Awaiting failed Task did not throw.")]
@@ -22,17 +22,17 @@ namespace AsyncEnumeratorTests
             var seq = Test1();
 
             await seq.MoveNext();
-            Assert.AreEqual(seq.Current, 1, $"First call to {nameof(seq.MoveNext)} did not advance the enumeration correctly.");
+            Assert.AreEqual(1, seq.Current, $"First call to {nameof(seq.MoveNext)} did not advance the enumeration correctly.");
 
             await seq.MoveNext();
-            Assert.AreEqual(seq.Current, 2, $"Call to {nameof(seq.MoveNext)} did not advance the enumeration correctly.");
+            Assert.AreEqual(2, seq.Current, $"Call to {nameof(seq.MoveNext)} did not advance the enumeration correctly.");
 
             await seq.MoveNext();
-            Assert.AreEqual(seq.Current, 3, $"Call to {nameof(seq.MoveNext)} did not advance the enumeration correctly.");
+            Assert.AreEqual(3, seq.Current, $"Call to {nameof(seq.MoveNext)} did not advance the enumeration correctly.");
 
             Assert.IsFalse(await seq.MoveNext(), $"Call to {nameof(seq.MoveNext)} did not return false after enumeration completed.");
 
-            Assert.IsTrue(seq.IsCompleted, "Enumeration did not complete after return.");
+            Assert.IsTrue(seq.IsCompleted, "Enumeration did not complete after return.");            
         }
 
         [TestMethod]
@@ -41,19 +41,18 @@ namespace AsyncEnumeratorTests
             var seq = Test2();
 
             await seq.MoveNext();
-            Assert.AreEqual(seq.Current, 1, $"First call to {nameof(seq.MoveNext)} did not advance the enumeration correctly.");
+            Assert.AreEqual(1, seq.Current, $"First call to {nameof(seq.MoveNext)} did not advance the enumeration correctly.");
 
             await seq.MoveNext();
-            Assert.AreEqual(seq.Current, 2, $"Call to {nameof(seq.MoveNext)} did not advance the enumeration correctly.");
+            Assert.AreEqual(2, seq.Current, $"Call to {nameof(seq.MoveNext)} did not advance the enumeration correctly.");
 
             await seq.MoveNext();
-            Assert.AreEqual(seq.Current, 3, $"Call to {nameof(seq.MoveNext)} did not advance the enumeration correctly.");
+            Assert.AreEqual(3, seq.Current, $"Call to {nameof(seq.MoveNext)} did not advance the enumeration correctly.");
 
             Assert.IsFalse(await seq.MoveNext(), $"Call to {nameof(seq.MoveNext)} did not return false after enumeration completed.");
 
             Assert.IsTrue(seq.IsCompleted, "Enumeration did not complete after return.");
         }
-
 
         private static async AsyncEnumerator<int> ExceptionTest1()
         {
@@ -64,30 +63,33 @@ namespace AsyncEnumeratorTests
             throw new Exception();
         }
 
-        private static async AsyncEnumerator<int> Test1()
+        private static async AsyncSequence<int> Test1()
         {
-            var yield = await AsyncEnumerator<int>.Capture();
+            var yield = await AsyncSequence<int>.Capture();
 
-            await yield.Return(1);
+            await Task.Delay(0).ConfigureAwait(false);
 
-            await yield.Return(2);
+            yield.Return(1);
 
-            await yield.Return(3);
+            yield.Return(2);
+
+            yield.Return(3);
 
             return yield.Break();
         }
 
-        private static async AsyncEnumerator<int> Test2()
+        private static async AsyncSequence<int> Test2()
         {
-            var yield = await AsyncEnumerator<int>.Capture();
+            var yield = await AsyncSequence<int>.Capture();
+
+            await Task.Delay(0).ConfigureAwait(false);
 
             for (var i = 1; i <= 3; i++)
             {
-                await yield.Return(i);
+                yield.Return(i);
             }
 
             return yield.Break();
         }
-
     }
 }

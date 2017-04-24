@@ -1,39 +1,37 @@
 ﻿using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Text;
+using System.Runtime.ExceptionServices;
 using System.Threading.Tasks;
 
 namespace AsyncEnumerator
 {
-    public interface IAsyncParallelEnumeratorProducer<T>
+    public interface IAsyncSequenceProducer<T>
     {
-        void Yield(T value);
-        T YieldReturn();
+        void Return(T value);
+        T Break();
     }
 
-    [AsyncMethodBuilder(typeof(AsyncParallelEnumeratorMethodBuilder<>))]
-    public class AsyncParallelEnumerator<T>
-        : IAsyncParallelEnumeratorProducer<T>, IAsyncEnumerator<T>, ITaskLike
+    [AsyncMethodBuilder(typeof(AsyncSequenceMethodBuilder<>))]
+    public class AsyncSequence<T> : IAsyncSequenceProducer<T>, IAsyncEnumerator<T>, ITaskLike
     {
-        #region Fields
-
-        private TaskCompletionSource<bool> _nextSource;
-
         private readonly ConcurrentQueue<T> _valueQueue = new ConcurrentQueue<T>();
 
-        #endregion
+        private TaskCompletionSource<bool> _nextSource;
+        private ExceptionDispatchInfo _exception;
+
+        public static TaskProvider Capture() => TaskProvider.Instance;
 
         public T Current { get; internal set; }
 
         public bool IsCompleted { get; internal set; }
 
-        public static TaskProvider Capture() => TaskProvider.Instance;
+        public TaskLikeAwaiterBase GetAwaiter() => new AsyncSequenceAwaiter(this);
 
         public async Task<bool> MoveNext()
         {
+            _exception?.Throw();
+
             if (_valueQueue.TryDequeue(out var value))
             {
                 Current = value;
@@ -47,51 +45,24 @@ namespace AsyncEnumerator
 
             await _nextSource.Task;
 
-            if (_valueQueue.TryDequeue(out value))
-            {
-                Current = value;
-                return true;
-            }
+            if (!_valueQueue.TryDequeue(out value))
+                return !IsCompleted;
 
-            if (IsCompleted)
-                return false;
-
+            Current = value;
             return true;
         }
 
-        void IAsyncParallelEnumeratorProducer<T>.Yield(T value)
+        void IAsyncSequenceProducer<T>.Return(T value)
         {
             _valueQueue.Enqueue(value);
             _nextSource?.TrySetResult(true);
         }
 
-        T IAsyncParallelEnumeratorProducer<T>.YieldReturn()
+        T IAsyncSequenceProducer<T>.Break()
         {
             IsCompleted = true;
             _nextSource?.TrySetResult(false);
             return default(T);
-        }
-
-        public TaskLikeAwaiterBase GetAwaiter() => new AsyncEnumeratorAwaiter(this);
-
-        internal class AsyncEnumeratorAwaiter : TaskLikeAwaiterBase
-        {
-            #region Fields
-
-            private readonly AsyncParallelEnumerator<T> _task;
-            private TaskAwaiter _taskAwaiter;
-
-            #endregion
-
-            internal AsyncEnumeratorAwaiter(AsyncParallelEnumerator<T> task)
-            {
-                _task = task;
-                _taskAwaiter = new TaskAwaiter();
-            }
-
-            public override bool IsCompleted => _task.IsCompleted;
-
-            public override void OnCompleted(Action a) { _taskAwaiter.OnCompleted(a); }
         }
 
         public class TaskProvider
@@ -102,17 +73,13 @@ namespace AsyncEnumerator
 
             public class TaskProviderAwaiter : INotifyCompletion
             {
-                #region Fields
-
-                private AsyncParallelEnumerator<T> _enumerator;
-
-                #endregion
+                private AsyncSequence<T> _enumerator;
 
                 public bool IsCompleted => _enumerator != null;
 
-                public IAsyncParallelEnumeratorProducer<T> GetResult() => _enumerator;
+                public IAsyncSequenceProducer<T> GetResult() => _enumerator;
 
-                public void OnCompleted(Action continuation, AsyncParallelEnumerator<T> asyncEnumerator)
+                public void OnCompleted(Action continuation, AsyncSequence<T> asyncEnumerator)
                 {
                     _enumerator = asyncEnumerator;
                     Task.Run(continuation);
@@ -121,15 +88,37 @@ namespace AsyncEnumerator
                 public void OnCompleted(Action continuation) => throw new InvalidOperationException("OnCompleted override with asyncEnumerator param must be called.");
             }
         }
+
+        internal class AsyncSequenceAwaiter : TaskLikeAwaiterBase
+        {
+            private readonly AsyncSequence<T> _task;
+            private TaskAwaiter _taskAwaiter;
+
+            internal AsyncSequenceAwaiter(AsyncSequence<T> task)
+            {
+                _task = task;
+                _taskAwaiter = new TaskAwaiter();
+            }
+
+            public override bool IsCompleted => _task.IsCompleted;
+
+            public override void OnCompleted(Action a) => _taskAwaiter.OnCompleted(a);
+        }
+
+        public void SetException(ExceptionDispatchInfo exception)
+        {
+            _exception = exception;            
+            _nextSource?.TrySetException(exception.SourceException);
+        }
     }
 
-    public struct AsyncParallelEnumeratorMethodBuilder<T>
+    public struct AsyncSequenceMethodBuilder<T>
     {
         private AsyncTaskMethodBuilder<T> _methodBuilder;
 
-        public static AsyncParallelEnumeratorMethodBuilder<T> Create() => new AsyncParallelEnumeratorMethodBuilder<T>(new AsyncParallelEnumerator<T>());
+        public static AsyncSequenceMethodBuilder<T> Create() => new AsyncSequenceMethodBuilder<T>(new AsyncSequence<T>());
 
-        internal AsyncParallelEnumeratorMethodBuilder(AsyncParallelEnumerator<T> task)
+        internal AsyncSequenceMethodBuilder(AsyncSequence<T> task)
         {
             _methodBuilder = AsyncTaskMethodBuilder<T>.Create();
             Task = task;
@@ -140,7 +129,7 @@ namespace AsyncEnumerator
         public void Start<TStateMachine>(ref TStateMachine stateMachine)
             where TStateMachine : IAsyncStateMachine => stateMachine.MoveNext();
 
-        public void SetException(Exception e) => Task.IsCompleted = true;
+        public void SetException(Exception ex) => Task.SetException(ExceptionDispatchInfo.Capture(ex));
 
         public void SetResult(T value) => Task.IsCompleted = true;
 
@@ -149,10 +138,10 @@ namespace AsyncEnumerator
             where TStateMachine : IAsyncStateMachine
         {
             // The requirement for this cast is ridiculous. Pattern matching doesn't work with generics...
-            if((INotifyCompletion)awaiter is AsyncParallelEnumerator<T>.TaskProvider.TaskProviderAwaiter provider) 
+            if ((INotifyCompletion) awaiter is AsyncSequence<T>.TaskProvider.TaskProviderAwaiter provider)
                 provider.OnCompleted(((IAsyncStateMachine) stateMachine).MoveNext, Task);
             else
-                _methodBuilder.AwaitOnCompleted(ref awaiter, ref stateMachine);        
+                _methodBuilder.AwaitOnCompleted(ref awaiter, ref stateMachine);
         }
 
         public void AwaitUnsafeOnCompleted<TAwaiter, TStateMachine>(ref TAwaiter awaiter, ref TStateMachine stateMachine)
@@ -162,6 +151,6 @@ namespace AsyncEnumerator
             _methodBuilder.AwaitUnsafeOnCompleted(ref awaiter, ref stateMachine);
         }
 
-        public AsyncParallelEnumerator<T> Task { get; }
+        public AsyncSequence<T> Task { get; }
     }
 }

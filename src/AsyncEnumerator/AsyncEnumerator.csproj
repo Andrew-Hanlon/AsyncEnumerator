@@ -59,7 +59,7 @@
   <ItemGroup>
     <Compile Include="AsyncEnumerator.cs" />
     <Compile Include="AsyncEnumeratorExtensions.cs" />
-    <Compile Include="AsyncParallelEnumerator.cs" />
+    <Compile Include="AsyncSequence.cs" />
     <Compile Include="AsyncMethodBuilderAttribute.cs" />
     <Compile Include="CoopTask.cs" />
     <Compile Include="IAsyncEnumerator.cs" />

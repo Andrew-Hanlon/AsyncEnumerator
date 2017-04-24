@@ -4,52 +4,53 @@ using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 
 namespace AsyncEnumerator
-{
-    [AsyncMethodBuilder(typeof(TaskLikeObservableMethodBuilder<>))]
-    public class TaskLikeObservable<T>
-        : IObservable<T>, ITaskLikeSubject<T>
+{    
+    public interface ITaskLikeSubject<T>
     {
-        #region Fields
+        Task Subscription { get; }
 
+        T OnCompleted();
+        void OnNext(T value);
+    }
+
+    [AsyncMethodBuilder(typeof(TaskLikeObservableMethodBuilder<>))]
+    public class TaskLikeObservable<T> : IObservable<T>, ITaskLikeSubject<T>
+    {
         private readonly Subject<T> _subject = new Subject<T>();
 
-        private TaskCompletionSource<bool> _subscribeTask = new TaskCompletionSource<bool>();
+        private readonly TaskCompletionSource<bool> _subscribeTask = new TaskCompletionSource<bool>();
 
-        #endregion
+        public static TaskLikeObservableProvider Capture() => TaskLikeObservableProvider.Instance;
 
         public T Current { get; internal set; }
 
         public bool IsCompleted { get; internal set; }
 
-        public T Result { get; internal set; }
-
         public Task Subscription => _subscribeTask.Task;
 
-        public static TaskLikeObservableProvider Capture() => TaskLikeObservableProvider.Instance;
+        public void SetException(Exception exception) => _subject.OnError(exception);
+
+        public IDisposable Subscribe(IObserver<T> observer)
+        {
+            var ret = _subject.Subscribe(observer);
+
+            _subscribeTask.TrySetResult(true);
+
+            return ret;
+        }
 
         internal AsyncEnumeratorAwaiter GetAwaiter() => new AsyncEnumeratorAwaiter(this);
 
-        internal class AsyncEnumeratorAwaiter : INotifyCompletion
+        T ITaskLikeSubject<T>.OnCompleted()
         {
-            #region Fields
+            _subject.OnCompleted();
 
-            private readonly TaskLikeObservable<T> _task;
-            private TaskAwaiter _taskAwaiter;
+            IsCompleted = true;
 
-            #endregion
-
-            internal AsyncEnumeratorAwaiter(TaskLikeObservable<T> task)
-            {
-                _task = task;
-                _taskAwaiter = new TaskAwaiter();
-            }
-
-            internal bool IsCompleted => _task.IsCompleted;
-
-            public void OnCompleted(Action a) { _taskAwaiter.OnCompleted(a); }
-
-            internal T GetResult() => _task.Result;
+            return default(T);
         }
+
+        void ITaskLikeSubject<T>.OnNext(T value) { _subject.OnNext(value); }
 
         public class TaskLikeObservableProvider
         {
@@ -59,11 +60,7 @@ namespace AsyncEnumerator
 
             public class AsyncEnumeratorProviderAwaiter : INotifyCompletion
             {
-                #region Fields
-
                 private TaskLikeObservable<T> _enumerator;
-
-                #endregion
 
                 public bool IsCompleted => _enumerator != null;
 
@@ -79,36 +76,23 @@ namespace AsyncEnumerator
             }
         }
 
-        public IDisposable Subscribe(IObserver<T> observer)
+        internal class AsyncEnumeratorAwaiter : INotifyCompletion
         {
-            var ret = _subject.Subscribe(observer);
+            private readonly TaskLikeObservable<T> _task;
+            private TaskAwaiter _taskAwaiter;
 
-            _subscribeTask.TrySetResult(true);
+            internal AsyncEnumeratorAwaiter(TaskLikeObservable<T> task)
+            {
+                _task = task;
+                _taskAwaiter = new TaskAwaiter();
+            }
 
-            return ret;
+            internal bool IsCompleted => _task.IsCompleted;
+
+            public void OnCompleted(Action a) { _taskAwaiter.OnCompleted(a); }
+
+            internal void GetResult() { }
         }
-
-        void ITaskLikeSubject<T>.OnNext(T value)
-        {
-            _subject.OnNext(value);
-        }
-
-        T ITaskLikeSubject<T>.OnCompleted()
-        {
-            _subject.OnCompleted();
-
-            IsCompleted = true;
-
-            return default(T);
-        }
-    }
-
-    public interface ITaskLikeSubject<T>
-    {
-        void OnNext(T value);
-
-        T OnCompleted();
-        Task Subscription { get; }
     }
 
     public struct TaskLikeObservableMethodBuilder<T>
@@ -128,13 +112,9 @@ namespace AsyncEnumerator
         public void Start<TStateMachine>(ref TStateMachine stateMachine)
             where TStateMachine : IAsyncStateMachine => stateMachine.MoveNext();
 
-        public void SetException(Exception e) => Task.IsCompleted = true;
+        public void SetException(Exception e) => Task.SetException(e);
 
-        public void SetResult(T value)
-        {
-            Task.Result = value;
-            Task.IsCompleted = true;
-        }
+        public void SetResult(T value) => Task.IsCompleted = true;
 
         public void AwaitOnCompleted<TAwaiter, TStateMachine>(ref TAwaiter awaiter, ref TStateMachine stateMachine)
             where TAwaiter : INotifyCompletion
