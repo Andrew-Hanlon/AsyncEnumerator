@@ -1,4 +1,4 @@
-# Task-like AsyncEnumerator
+# Task-like Async Enumerators
 ## _a.k.a Abusing Task-like Types in C# 7_
 
 Since async/await was first released I have longed for 'async iterator' methods that could combine both the yield and async syntaxes.
