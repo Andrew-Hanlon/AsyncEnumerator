@@ -6,7 +6,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 namespace AsyncEnumeratorTests
 {
     [TestClass]
-    public class AsyncEnumeratorTests
+    public class CoopTaskTests
     {
         [TestMethod]
         [ExpectedException(typeof(Exception), "Awaiting failed Task did not throw.")]
@@ -21,15 +21,10 @@ namespace AsyncEnumeratorTests
         {
             var seq = Test1();
 
+            await seq.MoveNextAsync();            
+            await seq.MoveNextAsync();            
             await seq.MoveNextAsync();
-            Assert.AreEqual(seq.Current, 1, $"First call to {nameof(seq.MoveNextAsync)} did not advance the enumeration correctly.");
-
-            await seq.MoveNextAsync();
-            Assert.AreEqual(seq.Current, 2, $"Call to {nameof(seq.MoveNextAsync)} did not advance the enumeration correctly.");
-
-            await seq.MoveNextAsync();
-            Assert.AreEqual(seq.Current, 3, $"Call to {nameof(seq.MoveNextAsync)} did not advance the enumeration correctly.");
-
+            
             Assert.IsFalse(await seq.MoveNextAsync(), $"Call to {nameof(seq.MoveNextAsync)} did not return false after enumeration completed.");
 
             Assert.IsTrue(seq.IsCompleted, "Enumeration did not complete after return.");
@@ -41,13 +36,8 @@ namespace AsyncEnumeratorTests
             var seq = Test2();
 
             await seq.MoveNextAsync();
-            Assert.AreEqual(seq.Current, 1, $"First call to {nameof(seq.MoveNextAsync)} did not advance the enumeration correctly.");
-
             await seq.MoveNextAsync();
-            Assert.AreEqual(seq.Current, 2, $"Call to {nameof(seq.MoveNextAsync)} did not advance the enumeration correctly.");
-
             await seq.MoveNextAsync();
-            Assert.AreEqual(seq.Current, 3, $"Call to {nameof(seq.MoveNextAsync)} did not advance the enumeration correctly.");
 
             Assert.IsFalse(await seq.MoveNextAsync(), $"Call to {nameof(seq.MoveNextAsync)} did not return false after enumeration completed.");
 
@@ -55,38 +45,34 @@ namespace AsyncEnumeratorTests
         }
 
 
-        private static async AsyncEnumerator<int> ExceptionTest1()
+        private static async CoopTask ExceptionTest1()
         {
-            var yield = await AsyncEnumerator<int>.Capture();
+            var yield = await CoopTask.Capture();
 
-            await yield.Return(1);
+            await yield.Yield();
 
             throw new Exception();
         }
 
-        private static async AsyncEnumerator<int> Test1()
+        private static async CoopTask Test1()
         {
-            var yield = await AsyncEnumerator<int>.Capture();
+            var yield = await CoopTask.Capture();
 
-            await yield.Return(1);
+            await yield.Yield();
 
-            await yield.Return(2);
+            await yield.Yield();
 
-            await yield.Return(3);
-
-            return yield.Break();
+            await yield.Yield();
         }
 
-        private static async AsyncEnumerator<int> Test2()
+        private static async CoopTask Test2()
         {
-            var yield = await AsyncEnumerator<int>.Capture();
+            var yield = await CoopTask.Capture();
 
             for (var i = 1; i <= 3; i++)
             {
-                await yield.Return(i);
+                await yield.Yield();
             }
-
-            return yield.Break();
         }
 
     }

@@ -1,23 +1,36 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace AsyncEnumerator
 {
     public interface ICoopTaskProducer
     {
-        Task Yield();
         void Break();
+        Task Yield();
     }
 
     [AsyncMethodBuilder(typeof(CoopTaskMethodBuilder))]
     public class CoopTask : ICoopTaskProducer, ITaskLike
     {
-        public Task<bool> MoveNext()
+        private ExceptionDispatchInfo _exception;
+
+        private bool _isStarted;
+        private TaskCompletionSource<bool> _nextSource;
+        private TaskCompletionSource<bool> _yieldSource;
+
+        public static TaskProvider Capture() => TaskProvider.Instance;
+
+        public bool IsCompleted { get; internal set; }
+
+        public TaskLikeAwaiterBase GetAwaiter()
+        {
+            _exception?.Throw();
+            return new AsyncEnumeratorAwaiter(this);
+        }
+
+        public Task<bool> MoveNextAsync()
         {
             _exception?.Throw();
 
@@ -31,11 +44,22 @@ namespace AsyncEnumerator
 
             _yieldSource?.TrySetResult(true);
 
-            if (_yieldSource == null)
-                return Task.FromResult(true);
-
-            return _nextSource.Task;
+            return _yieldSource == null ? Task.FromResult(true) : _nextSource.Task;
         }
+
+        internal void SetCompletion()
+        {
+            IsCompleted = true;
+            _nextSource.TrySetResult(false);
+        }
+
+        internal void SetException(ExceptionDispatchInfo exception)
+        {
+            _exception = exception;
+            _nextSource?.TrySetException(exception.SourceException);
+        }
+
+        void ICoopTaskProducer.Break() => _nextSource.TrySetResult(false);
 
         Task ICoopTaskProducer.Yield()
         {
@@ -46,36 +70,39 @@ namespace AsyncEnumerator
             return _yieldSource.Task;
         }
 
-        void ICoopTaskProducer.Break()
+        public class TaskProvider
         {
-            _nextSource.TrySetResult(false);
-            return;
-        }
+            public static readonly TaskProvider Instance = new TaskProvider();
 
-        public bool IsCompleted { get; internal set; }
+            public TaskProviderAwaiter GetAwaiter() { return new TaskProviderAwaiter(); }
 
-        public TaskLikeAwaiterBase GetAwaiter()
-        {
-            _exception?.Throw();
-            return new AsyncEnumeratorAwaiter(this);
-        }
+            public class TaskProviderAwaiter : INotifyCompletion, ITaskProviderAwaiter
+            {
+                private CoopTask _enumerator;
 
-        public static TaskProvider Capture() => TaskProvider.Instance;
+                public bool IsCompleted => _enumerator != null;
 
-        public void SetException(ExceptionDispatchInfo exception)
-        {
-            _exception = exception;
-            _nextSource?.TrySetException(exception.SourceException);
-        }
+                public ICoopTaskProducer GetResult() { return _enumerator; }
 
-        internal void SetCompletion()
-        {
-            IsCompleted = true;
-            _nextSource.TrySetResult(false);
+                public void OnCompleted(Action continuation)
+                {
+                    throw new InvalidOperationException(
+                                                        "OnCompleted override with asyncEnumerator param must be called.");
+                }
+
+                public void OnCompleted(Action continuation, ITaskLike asyncEnumerator)
+                {
+                    _enumerator = (CoopTask) asyncEnumerator;
+                    continuation();
+                }
+            }
         }
 
         internal class AsyncEnumeratorAwaiter : TaskLikeAwaiterBase
         {
+            private readonly CoopTask _task;
+            private TaskAwaiter _taskAwaiter;
+
             internal AsyncEnumeratorAwaiter(CoopTask task)
             {
                 _task = task;
@@ -87,61 +114,7 @@ namespace AsyncEnumerator
             public override void GetResult() => _task._exception?.Throw();
 
             public override void OnCompleted(Action a) => _taskAwaiter.OnCompleted(a);
-
-            #region Fields
-
-            private readonly CoopTask _task;
-            private TaskAwaiter _taskAwaiter;
-
-            #endregion
         }
-
-        public class TaskProvider
-        {
-            public static readonly TaskProvider Instance = new TaskProvider();
-
-            public TaskProviderAwaiter GetAwaiter()
-            {
-                return new TaskProviderAwaiter();
-            }
-
-            public class TaskProviderAwaiter : INotifyCompletion
-            {
-                #region Fields
-
-                private CoopTask _enumerator;
-
-                #endregion
-
-                public bool IsCompleted => _enumerator != null;
-
-                public void OnCompleted(Action continuation)
-                {
-                    throw new InvalidOperationException(
-                        "OnCompleted override with asyncEnumerator param must be called.");
-                }
-
-                public ICoopTaskProducer GetResult()
-                {
-                    return _enumerator;
-                }
-
-                public void OnCompleted(Action continuation, CoopTask asyncEnumerator)
-                {
-                    _enumerator = asyncEnumerator;
-                    continuation();
-                }
-            }
-        }
-
-        #region Fields
-
-        private bool _isStarted;
-        private TaskCompletionSource<bool> _nextSource;
-        private TaskCompletionSource<bool> _yieldSource;
-        private ExceptionDispatchInfo _exception;
-
-        #endregion
     }
 
     public struct CoopTaskMethodBuilder
@@ -156,7 +129,7 @@ namespace AsyncEnumerator
             Task = task;
         }
 
-        public void SetStateMachine(IAsyncStateMachine stateMachine){}
+        public void SetStateMachine(IAsyncStateMachine stateMachine) { }
 
         public void Start<TStateMachine>(ref TStateMachine stateMachine)
             where TStateMachine : IAsyncStateMachine => stateMachine.MoveNext();
@@ -176,7 +149,7 @@ namespace AsyncEnumerator
         }
 
         public void AwaitUnsafeOnCompleted<TAwaiter, TStateMachine>(ref TAwaiter awaiter,
-            ref TStateMachine stateMachine)
+                                                                    ref TStateMachine stateMachine)
             where TAwaiter : ICriticalNotifyCompletion
             where TStateMachine : IAsyncStateMachine
         {

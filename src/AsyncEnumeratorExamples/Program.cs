@@ -51,7 +51,7 @@ namespace AsyncEnumeratorExamples
         {
             var p = Producer();
 
-            while (await p.MoveNext())          // Await the next value 
+            while (await p.MoveNextAsync())          // Await the next value 
             {
                 Console.WriteLine(p.Current);   // Use the current value
             }
@@ -62,7 +62,7 @@ namespace AsyncEnumeratorExamples
         {
             var p = Producer2();
 
-            while (await p.MoveNext())
+            while (await p.MoveNextAsync())
             {
                 Console.WriteLine(p.Current);
             }
@@ -112,15 +112,23 @@ namespace AsyncEnumeratorExamples
         {
             var task = await CoopTask.Capture();          // Capture the underlying 'Task'
 
+            Console.WriteLine("P0");
+
             await task.Yield();                           // Optionally Wait for first MoveNext call
 
             await Task.Delay(100).ConfigureAwait(false);  // Use any async constructs
+
+            Console.WriteLine("P1");
 
             await task.Yield();                           // Yield a value and wait for MoveNext
 
             await Task.Delay(100);
 
-            await task.Yield();
+            Console.WriteLine("P2");
+
+            task.Break();                                 // Mark the task as completed
+
+            Console.WriteLine("P3");                      // Will not be run.
         }
 
         public static async Task Consumer4()
@@ -129,9 +137,9 @@ namespace AsyncEnumeratorExamples
 
             var i = 1;
 
-            while (await p.MoveNext())          // Await the next value 
+            while (await p.MoveNextAsync())          // Await the next value 
             {
-                Console.WriteLine(i++);         // Use the current value
+                Console.WriteLine("C" + i++);        // Use the current value
             }
         }
     }

@@ -13,7 +13,7 @@ namespace AsyncEnumeratorTests
         public async Task ThrowsOnMoveNext()
         {            
             var seq = ExceptionTest1();
-            while(await seq.MoveNext()){}
+            while(await seq.MoveNextAsync()){}
         }
 
         [TestMethod]
@@ -21,16 +21,16 @@ namespace AsyncEnumeratorTests
         {
             var seq = Test1();
 
-            await seq.MoveNext();
-            Assert.AreEqual(1, seq.Current, $"First call to {nameof(seq.MoveNext)} did not advance the enumeration correctly.");
+            await seq.MoveNextAsync();
+            Assert.AreEqual(1, seq.Current, $"First call to {nameof(seq.MoveNextAsync)} did not advance the enumeration correctly.");
 
-            await seq.MoveNext();
-            Assert.AreEqual(2, seq.Current, $"Call to {nameof(seq.MoveNext)} did not advance the enumeration correctly.");
+            await seq.MoveNextAsync();
+            Assert.AreEqual(2, seq.Current, $"Call to {nameof(seq.MoveNextAsync)} did not advance the enumeration correctly.");
 
-            await seq.MoveNext();
-            Assert.AreEqual(3, seq.Current, $"Call to {nameof(seq.MoveNext)} did not advance the enumeration correctly.");
+            await seq.MoveNextAsync();
+            Assert.AreEqual(3, seq.Current, $"Call to {nameof(seq.MoveNextAsync)} did not advance the enumeration correctly.");
 
-            Assert.IsFalse(await seq.MoveNext(), $"Call to {nameof(seq.MoveNext)} did not return false after enumeration completed.");
+            Assert.IsFalse(await seq.MoveNextAsync(), $"Call to {nameof(seq.MoveNextAsync)} did not return false after enumeration completed.");
 
             Assert.IsTrue(seq.IsCompleted, "Enumeration did not complete after return.");            
         }
@@ -40,16 +40,16 @@ namespace AsyncEnumeratorTests
         {
             var seq = Test2();
 
-            await seq.MoveNext();
-            Assert.AreEqual(1, seq.Current, $"First call to {nameof(seq.MoveNext)} did not advance the enumeration correctly.");
+            await seq.MoveNextAsync();
+            Assert.AreEqual(1, seq.Current, $"First call to {nameof(seq.MoveNextAsync)} did not advance the enumeration correctly.");
 
-            await seq.MoveNext();
-            Assert.AreEqual(2, seq.Current, $"Call to {nameof(seq.MoveNext)} did not advance the enumeration correctly.");
+            await seq.MoveNextAsync();
+            Assert.AreEqual(2, seq.Current, $"Call to {nameof(seq.MoveNextAsync)} did not advance the enumeration correctly.");
 
-            await seq.MoveNext();
-            Assert.AreEqual(3, seq.Current, $"Call to {nameof(seq.MoveNext)} did not advance the enumeration correctly.");
+            await seq.MoveNextAsync();
+            Assert.AreEqual(3, seq.Current, $"Call to {nameof(seq.MoveNextAsync)} did not advance the enumeration correctly.");
 
-            Assert.IsFalse(await seq.MoveNext(), $"Call to {nameof(seq.MoveNext)} did not return false after enumeration completed.");
+            Assert.IsFalse(await seq.MoveNextAsync(), $"Call to {nameof(seq.MoveNextAsync)} did not return false after enumeration completed.");
 
             Assert.IsTrue(seq.IsCompleted, "Enumeration did not complete after return.");
         }
