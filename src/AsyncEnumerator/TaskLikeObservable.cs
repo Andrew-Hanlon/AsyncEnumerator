@@ -8,7 +8,6 @@ namespace AsyncEnumerator
     public interface ITaskLikeSubject<T>
     {
         Task Subscription { get; }
-
         T OnCompleted();
         void OnNext(T value);
     }

@@ -12,6 +12,6 @@ namespace AsyncEnumerator
 
         public virtual bool IsCompleted { get; protected set; }
 
-        public virtual void GetResult() { }
+        public abstract void GetResult();
     }
 }

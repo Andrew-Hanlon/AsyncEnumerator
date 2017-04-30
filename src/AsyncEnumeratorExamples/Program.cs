@@ -5,9 +5,9 @@ using System.Reactive.Linq;
 
 namespace AsyncEnumeratorExamples
 {
-    class Program
+    internal class Program
     {
-        static void Main(string[] args)
+        private static void Main()
         {
             MainAsync().GetAwaiter().GetResult();
         }
@@ -22,6 +22,9 @@ namespace AsyncEnumeratorExamples
 
             Console.WriteLine("\nTaskLikeObservable:");
             await Consumer3();
+
+            Console.WriteLine("\nCoopTask:");
+            await Consumer4();
 
             Console.WriteLine("\nPress any key to exit.");
             Console.ReadKey(true);
@@ -41,7 +44,7 @@ namespace AsyncEnumeratorExamples
 
             await yield.Return(2);
 
-            return yield.Break();                       // Return false to awaiting MoveNext
+            return yield.Break();       // Return false to awaiting MoveNext
         }
 
         public static async Task Consumer()
@@ -54,7 +57,7 @@ namespace AsyncEnumeratorExamples
             }
         }
 
-
+        
         public static async Task Consumer2()
         {
             var p = Producer2();
@@ -69,9 +72,9 @@ namespace AsyncEnumeratorExamples
         {
             var yield = await AsyncSequence<int>.Capture(); // Capture the underlying 'Task'
 
-            await Task.Delay(100).ConfigureAwait(false);          // Use any async constructs
+            await Task.Delay(100).ConfigureAwait(false);    // Use any async constructs
 
-            yield.Return(1);                                      // Yield the value and continue
+            yield.Return(1);                                // Yield the value and continue
 
             await Task.Delay(100).ConfigureAwait(false);
 
@@ -81,7 +84,7 @@ namespace AsyncEnumeratorExamples
 
             yield.Return(3);
 
-            return yield.Break();                               // Returns false to awaiting MoveNext
+            return yield.Break();                           // Returns false to awaiting MoveNext
         }
 
         public static Task Consumer3()
@@ -103,6 +106,33 @@ namespace AsyncEnumeratorExamples
             }
 
             return o.OnCompleted();
+        }
+
+        public static async CoopTask Producer4()
+        {
+            var task = await CoopTask.Capture();          // Capture the underlying 'Task'
+
+            await task.Yield();                           // Optionally Wait for first MoveNext call
+
+            await Task.Delay(100).ConfigureAwait(false);  // Use any async constructs
+
+            await task.Yield();                           // Yield a value and wait for MoveNext
+
+            await Task.Delay(100);
+
+            await task.Yield();
+        }
+
+        public static async Task Consumer4()
+        {
+            var p = Producer4();
+
+            var i = 1;
+
+            while (await p.MoveNext())          // Await the next value 
+            {
+                Console.WriteLine(i++);         // Use the current value
+            }
         }
     }
 }

@@ -103,6 +103,8 @@ namespace AsyncEnumerator
             public override bool IsCompleted => _task.IsCompleted;
 
             public override void OnCompleted(Action a) => _taskAwaiter.OnCompleted(a);
+
+            public override void GetResult() => _task._exception?.Throw();
         }
 
         public void SetException(ExceptionDispatchInfo exception)
