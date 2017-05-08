@@ -7,12 +7,12 @@ namespace AsyncEnumerator
 {
     public interface ICoopTaskProducer
     {
-        void Break();
+        Task Break();
         Task Yield();
     }
 
     [AsyncMethodBuilder(typeof(CoopTaskMethodBuilder))]
-    public class CoopTask : ICoopTaskProducer, ITaskLike
+    public class CoopTask : TaskLikeBase, ICoopTaskProducer, ITaskLike
     {
         private ExceptionDispatchInfo _exception;
 
@@ -20,11 +20,9 @@ namespace AsyncEnumerator
         private TaskCompletionSource<bool> _nextSource;
         private TaskCompletionSource<bool> _yieldSource;
 
-        public static TaskProvider Capture() => TaskProvider.Instance;
+        public static TaskProvider<ICoopTaskProducer> Capture() => TaskProvider<ICoopTaskProducer>.Instance;
 
-        public bool IsCompleted { get; internal set; }
-
-        public TaskLikeAwaiterBase GetAwaiter()
+        public override TaskLikeAwaiterBase GetAwaiter()
         {
             _exception?.Throw();
             return new AsyncEnumeratorAwaiter(this);
@@ -47,19 +45,24 @@ namespace AsyncEnumerator
             return _yieldSource == null ? Task.FromResult(true) : _nextSource.Task;
         }
 
-        internal void SetCompletion()
+        internal override void SetCompletion()
         {
             IsCompleted = true;
             _nextSource.TrySetResult(false);
         }
 
-        internal void SetException(ExceptionDispatchInfo exception)
+        internal override void SetException(ExceptionDispatchInfo exception)
         {
             _exception = exception;
             _nextSource?.TrySetException(exception.SourceException);
         }
 
-        void ICoopTaskProducer.Break() => _nextSource.TrySetResult(false);
+        Task ICoopTaskProducer.Break()
+        {
+            IsCompleted = true;
+            _nextSource.TrySetResult(false);
+            return new TaskCompletionSource<bool>().Task;
+        }
 
         Task ICoopTaskProducer.Yield()
         {
@@ -68,52 +71,6 @@ namespace AsyncEnumerator
             _nextSource?.TrySetResult(true);
 
             return _yieldSource.Task;
-        }
-
-        public class TaskProvider
-        {
-            public static readonly TaskProvider Instance = new TaskProvider();
-
-            public TaskProviderAwaiter GetAwaiter() { return new TaskProviderAwaiter(); }
-
-            public class TaskProviderAwaiter : INotifyCompletion, ITaskProviderAwaiter
-            {
-                private CoopTask _enumerator;
-
-                public bool IsCompleted => _enumerator != null;
-
-                public ICoopTaskProducer GetResult() { return _enumerator; }
-
-                public void OnCompleted(Action continuation)
-                {
-                    throw new InvalidOperationException(
-                                                        "OnCompleted override with asyncEnumerator param must be called.");
-                }
-
-                public void OnCompleted(Action continuation, ITaskLike asyncEnumerator)
-                {
-                    _enumerator = (CoopTask) asyncEnumerator;
-                    continuation();
-                }
-            }
-        }
-
-        internal class AsyncEnumeratorAwaiter : TaskLikeAwaiterBase
-        {
-            private readonly CoopTask _task;
-            private TaskAwaiter _taskAwaiter;
-
-            internal AsyncEnumeratorAwaiter(CoopTask task)
-            {
-                _task = task;
-                _taskAwaiter = new TaskAwaiter();
-            }
-
-            public override bool IsCompleted => _task.IsCompleted;
-
-            public override void GetResult() => _task._exception?.Throw();
-
-            public override void OnCompleted(Action a) => _taskAwaiter.OnCompleted(a);
         }
     }
 
@@ -142,7 +99,7 @@ namespace AsyncEnumerator
             where TAwaiter : INotifyCompletion
             where TStateMachine : IAsyncStateMachine
         {
-            if ((INotifyCompletion) awaiter is CoopTask.TaskProvider.TaskProviderAwaiter provider)
+            if ((INotifyCompletion) awaiter is TaskProvider<ICoopTaskProducer>.TaskProviderAwaiter provider)
                 provider.OnCompleted(((IAsyncStateMachine) stateMachine).MoveNext, Task);
             else
                 _methodBuilder.AwaitOnCompleted(ref awaiter, ref stateMachine);

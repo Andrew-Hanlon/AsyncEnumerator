@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 
 namespace AsyncEnumerator
 {
-    public static class AsyncEnumeratorExtensions
+    public static class ForeachExtensions
     {
 
         public static async Task ForeachAsync<T>(this IAsyncEnumerator<T> iter, Func<T, Task> action)

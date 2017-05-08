@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using AsyncEnumerator;
 using System.Reactive.Linq;
@@ -17,7 +18,7 @@ namespace AsyncEnumeratorExamples
             Console.WriteLine("AsyncEnumerator:");
             await Consumer();
 
-            Console.WriteLine("\nAsyncParallelEnumerator:");
+            Console.WriteLine("\nAsyncSequence:");
             await Consumer2();
 
             Console.WriteLine("\nTaskLikeObservable:");
@@ -25,6 +26,9 @@ namespace AsyncEnumeratorExamples
 
             Console.WriteLine("\nCoopTask:");
             await Consumer4();
+
+            Console.WriteLine("\nCoopTask2:");
+            await Consumer5();
 
             Console.WriteLine("\nPress any key to exit.");
             Console.ReadKey(true);
@@ -48,10 +52,10 @@ namespace AsyncEnumeratorExamples
         }
 
         public static async Task Consumer()
-        {
-            var p = Producer();
+        {            
+            var p = Producer();            
 
-            while (await p.MoveNextAsync())          // Await the next value 
+            while (await p.MoveNextAsync())     // Await the next value 
             {
                 Console.WriteLine(p.Current);   // Use the current value
             }
@@ -70,21 +74,16 @@ namespace AsyncEnumeratorExamples
 
         public static async AsyncSequence<int> Producer2()
         {
-            var yield = await AsyncSequence<int>.Capture(); // Capture the underlying 'Task'
+            var seq = await AsyncSequence<int>.Capture(); // Capture the underlying 'Task'
 
-            await Task.Delay(100).ConfigureAwait(false);    // Use any async constructs
+            for (int i = 1; i <= 5; i++)
+            {
+                await Task.Delay(100).ConfigureAwait(false); // Use any async constructs
 
-            yield.Return(1);                                // Yield the value and continue
+                seq.Return(i);  // Return to an awaiting MoveNext, or queue the result.
+            }
 
-            await Task.Delay(100).ConfigureAwait(false);
-
-            yield.Return(2);
-
-            await Task.Delay(100).ConfigureAwait(false);
-
-            yield.Return(3);
-
-            return yield.Break();                           // Returns false to awaiting MoveNext
+            return seq.Break();                           // Returns false to awaiting MoveNext
         }
 
         public static Task Consumer3()
@@ -126,7 +125,7 @@ namespace AsyncEnumeratorExamples
 
             Console.WriteLine("P2");
 
-            task.Break();                                 // Mark the task as completed
+            await task.Break();                           // Mark the task as completed
 
             Console.WriteLine("P3");                      // Will not be run.
         }
@@ -141,6 +140,50 @@ namespace AsyncEnumeratorExamples
             {
                 Console.WriteLine("C" + i++);        // Use the current value
             }
+        }
+
+        public static async CoopTask Producer5()
+        {
+            var task = await CoopTask.Capture();          // Capture the underlying 'Task'
+
+            Console.WriteLine("P 0");
+
+            await task.Yield();                           // Optionally Wait for first MoveNext call
+
+            await Task.Delay(100).ConfigureAwait(false);  // Use any async constructs
+
+            Console.WriteLine("P 1");
+
+            await task.Yield();                           // Yield a value and wait for MoveNext
+
+            await Task.Delay(100);
+
+            Console.WriteLine("P 2");
+
+            await task.Break();                           // Mark the task as completed
+
+            Console.WriteLine("P 3");                     // Will not be run.
+        }
+
+        public static async Task Consumer5()
+        {
+            Console.WriteLine("C 0");
+
+            var p = Producer5();
+            
+            await p.MoveNextAsync();
+            
+            Console.WriteLine("C 1");
+
+            await p.MoveNextAsync();
+            
+            Console.WriteLine("C 2");
+
+            await p.MoveNextAsync();
+            
+            Console.WriteLine("C 3");
+
+            await p;
         }
     }
 }
