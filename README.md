@@ -7,16 +7,18 @@ While there are several options currently available for asynchronous sequences (
 
 Async sequences are on the book for C# 8, and there are a number of [interesting discussions](https://github.com/dotnet/roslyn/issues/261) happening in the Rosyln issues.
 
-But why wait! With C# 7's new Task-Like types we finally have the possibility to create async methods that return custom types. By capturing the underlying task-like object from within the method itself, we can return values _before_ the task has completed.
+But why wait - with C# 7's new Task-Like types we finally have the possibility to create async methods that return custom types. By capturing the underlying task-like object from within the method itself, we can return values _before_ the task has completed.
 
-I believe this approach will have many cool applications. This repository contains my initial proof of concept.
+Mads Torgersen has repeated that very few people will create Task-Like type, but I believe this approach will have many cool applications. This repository contains my initial proof of concept.
 
 > ### Warning! 
-> I put this together as an experiment, there are likely better ways to approach most of the inner workings. I put zero emphasis on correctness, safety, or performance!
+> I put this together as an experiment, there are likely better ways to approach most of the inner workings. I put zero emphasis on correctness, safety, or performance.
 
 ### Details
 
 This repository contains several Task-like types that allow both cooporative and parallel async iterator methods. 
+
+#### AsyncEnumerator&lt;T&gt;
 
 The `AsyncEnumerator<T>` class provides behavior similar to a standard yield iterator method except that it allows for asynchronous operations. Each `Yield(T)` call returns a value and asynchronously waits for the next call to `MoveNext()`:
 
@@ -48,6 +50,7 @@ public static async Task Consumer()
 }
 
 ````````````
+#### AsyncSequence&lt;T&gt;
 
 While cooperative iteration is great, I believe the more common desire with async code would be to have the producer run in its own thread and simply await the availability of results (closer in concept to observables). The `AsyncParallelEnumerator<T>` shown below does exactly this:
 
@@ -80,6 +83,8 @@ public static async Task Consumer2()
 }
 
 ```````````````
+
+#### Other Types
 
 I also threw together several additional types with a similar approach. One is a `TaskLikeObservable` which allows you to write a _flat_ `IObservable` method such as:
 
