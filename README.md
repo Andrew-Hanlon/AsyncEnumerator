@@ -20,7 +20,7 @@ This repository contains several Task-like types that allow both cooporative and
 
 #### AsyncEnumerator&lt;T&gt;
 
-The `AsyncEnumerator<T>` class provides behavior similar to a standard yield iterator method except that it allows for asynchronous operations. Each `Yield(T)` call returns a value and asynchronously waits for the next call to `MoveNext()`:
+The `AsyncEnumerator<T>` class provides behavior similar to a standard yield iterator method except that it allows for asynchronous operations. Each `yield.Return(T)` call returns a value and asynchronously waits for the next call to `MoveNextAsync()`:
 
 ``````````` c#
 
@@ -145,7 +145,9 @@ public static async Task Consumer()
 
 ## Discussion
 
-There are likely more clever ways of implementing most of the internals of these types. The 'hack' for capturing the underlying Task-like object is not as bad as I thought it would have to be - it originally used reflection - but the current method still relies on a 'dummy' continuation.
+There are likely better ways of implementing most of the internals of these types.
+
+The 'hack' for capturing the underlying Task-like object is not as bad as I thought it would have to be - it originally used reflection - but the current method still relies on a 'dummy' continuation.
 
 The main oddity I have run into is that the compiler appears to treat all generic Task-like methods as if they should behave like `Task<T>` even when their builder semantics actually follow the void returning `Task` approach. This means you have to 'return' a value even though the _Task_ and awaiter have no `Result` field. I guess this isn't the intended purpose...
 
