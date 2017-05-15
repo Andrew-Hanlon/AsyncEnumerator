@@ -68,7 +68,6 @@
     <Compile Include="ITaskProviderAwaiter.cs" />
     <Compile Include="ITaskLike.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="TaskLikeAwaiterBase.cs" />
     <Compile Include="TaskLikeBase.cs" />
     <Compile Include="TaskLikeObservable.cs" />
     <Compile Include="TaskProvider.cs" />

@@ -4,6 +4,6 @@ namespace AsyncEnumerator
     {
         bool IsCompleted { get; }
 
-        TaskLikeAwaiterBase GetAwaiter();
+        TaskLikeBase.TaskLikeAwaiter GetAwaiter();
     }
 }

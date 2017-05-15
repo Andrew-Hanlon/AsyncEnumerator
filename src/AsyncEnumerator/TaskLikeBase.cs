@@ -8,28 +8,28 @@ namespace AsyncEnumerator
     {
         public bool IsCompleted { get; protected set; }
 
-        public virtual TaskLikeAwaiterBase GetAwaiter() => new AsyncEnumeratorAwaiter(this);
+        public virtual TaskLikeAwaiter GetAwaiter() => new TaskLikeAwaiter(this);
 
         internal virtual void SetCompletion() => IsCompleted = true;
 
         internal abstract void SetException(ExceptionDispatchInfo exception);
 
-        public class AsyncEnumeratorAwaiter : TaskLikeAwaiterBase
+        public class TaskLikeAwaiter : INotifyCompletion
         {
             private readonly ITaskLike _task;
             private TaskAwaiter _taskAwaiter;
 
-            internal AsyncEnumeratorAwaiter(ITaskLike task)
+            internal TaskLikeAwaiter(ITaskLike task)
             {
                 _task = task;
                 _taskAwaiter = new TaskAwaiter();
             }
 
-            public override bool IsCompleted => _task.IsCompleted;
+            public bool IsCompleted => _task.IsCompleted;
 
-            public override void GetResult() { }
+            public void GetResult() { }
 
-            public override void OnCompleted(Action a) { _taskAwaiter.OnCompleted(a); }
+            public void OnCompleted(Action a) { _taskAwaiter.OnCompleted(a); }
         }
     }
 }

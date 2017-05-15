@@ -22,10 +22,10 @@ namespace AsyncEnumerator
 
         public static TaskProvider<ICoopTaskProducer> Capture() => TaskProvider<ICoopTaskProducer>.Instance;
 
-        public override TaskLikeAwaiterBase GetAwaiter()
+        public override TaskLikeAwaiter GetAwaiter()
         {
             _exception?.Throw();
-            return new AsyncEnumeratorAwaiter(this);
+            return new TaskLikeAwaiter(this);
         }
 
         public Task<bool> MoveNextAsync()

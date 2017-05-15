@@ -112,24 +112,6 @@ namespace AsyncEnumerator
             _valueQueue.Enqueue(value);
             _nextSource?.TrySetResult(true);
         }
-
-        internal class AsyncSequenceAwaiter : TaskLikeAwaiterBase
-        {
-            private readonly AsyncSequence<T> _task;
-            private TaskAwaiter _taskAwaiter;
-
-            internal AsyncSequenceAwaiter(AsyncSequence<T> task)
-            {
-                _task = task;
-                _taskAwaiter = new TaskAwaiter();
-            }
-
-            public override bool IsCompleted => _task.IsCompleted;
-
-            public override void GetResult() => _task._exception?.Throw();
-
-            public override void OnCompleted(Action a) => _taskAwaiter.OnCompleted(a);
-        }
     }
 
     public struct AsyncSequenceMethodBuilder<T>

@@ -1,7 +1,7 @@
 # Task-like Async Enumerators
 ## _a.k.a Abusing Task-like Types in C# 7_
 
-Since async/await was first released I have often longed for 'async iterator' methods that could combine both the yield and async syntaxes.
+Since async/await was first released many have craved a corresponding 'async iterator' approach that could blend both the yield and async syntaxes.
 
 While there are several options currently available for asynchronous sequences (Rx Observables, DataFlow blocks), none have the concise beauty of async/await and yield iterators. 
 
@@ -9,7 +9,7 @@ Async sequences are on the book for C# 8, and there are a number of [interesting
 
 But why wait - with C# 7's new Task-Like types we finally have the possibility to create async methods that return custom types. By capturing the underlying task-like object from within the method itself, we can return values _before_ the task has completed.
 
-Mads Torgersen has repeated that very few people will create Task-Like type, but I believe this approach will have many cool applications. This repository contains my initial proof of concept.
+Mads Torgersen has repeated that very few people will create Task-Like types, but I believe the approach shown here will have many cool applications. This repository contains my initial proof of concept.
 
 > ### Warning! 
 > I put this together as an experiment, there are likely better ways to approach most of the inner workings. I put zero emphasis on correctness, safety, or performance.
@@ -28,7 +28,7 @@ public static async AsyncEnumerator<int> Producer()
 {
     var yield = await AsyncEnumerator<int>.Capture(); // Capture the underlying 'Task'
 
-    await yield.Pause();             // Optionally wait for first MoveNext call
+    await yield.Pause();             // Optionally wait for the first MoveNext call
 
     await yield.Return(1);           // Yield the value and await MoveNext
                    
@@ -52,7 +52,7 @@ public static async Task Consumer()
 ````````````
 #### AsyncSequence&lt;T&gt;
 
-While cooperative iteration is great, I believe the more common desire with async code would be to have the producer run in its own thread and simply await the availability of results (closer in concept to observables). The `AsyncParallelEnumerator<T>` shown below does exactly this:
+While cooperative iteration is great, I believe the more common desire with async code would be to have the producer run in its own thread and simply await the availability of results (closer in concept to observables). The `AsyncSequence<T>` class shown below accomplishes this goal:
 
 ``````````` c#
 
@@ -86,7 +86,7 @@ public static async Task Consumer2()
 
 #### Other Types
 
-I also threw together several additional types with a similar approach. One is a `TaskLikeObservable` which allows you to write a _flat_ `IObservable` method such as:
+I also threw together several additional types with a similar approach. One is a `TaskLikeObservable` which allows you to write a _flat_ and async `IObservable` method such as:
 
 `````````````` c#
 
@@ -112,32 +112,42 @@ Producer().Subscribe(i => DoSomethingWith(i));          // Run and subscribe to 
 
 ```````````````
 
-Lastly I added a `CoopTask` class which allows the parent and child task to pass back and forth control similarly to a yielding enumerator, but of course with async constructs:
+Lastly I added a `CoopTask` class which allows a parent and child task to pass control back and forth similarly to a yielding enumerator:
 
 ``````````` c#
 
-public static async AsyncEnumerator<int> Producer()
+public static async CoopTask Child()
 {
-    var yield = await AsyncEnumerator<int>.Capture(); // Capture the underlying 'Task'
+    var task = await CoopTask.Capture();          // Capture the underlying 'Task'
 
-    await yield.Pause();              // Optionally wait for first MoveNext call
+    Console.WriteLine("P0");
 
-    await yield.Return(1);            // Yield the value and wait for MoveNext
-                   
-    await Task.Delay(100);            // Use any async constructs
+    await task.Yield();                           // Yield control back to parent
 
-    await yield.Return(2);
+    await Task.Delay(100).ConfigureAwait(false);  // Use any async constructs
 
-    return yield.Break();             // Return false to awaiting MoveNext
+    Console.WriteLine("P1");
+
+    await task.Yield();                           // Yield control
+
+    await Task.Delay(100);
+
+    Console.WriteLine("P2");
+
+    await task.Break();                           // Mark the task as completed
+
+    Console.WriteLine("P3");                      // Will not be run.
 }
 
-public static async Task Consumer()
+public static async Task Parent()
 {
-    var p = Producer();                       
+    var p = Child();
 
-    while (await p.MoveNextAsync())           // Await the next value
+    var i = 1;
+
+    while (await p.MoveNextAsync())          // Await the next child operation
     {
-        Console.WriteLine(" " + p.Current);   // Use the current value
+        Console.WriteLine("C" + i++);        
     }
 }
 
@@ -145,13 +155,13 @@ public static async Task Consumer()
 
 ## Discussion
 
-There are likely better ways of implementing most of the internals of these types.
+There are likely better ways of implementing most of the internals of these types. For one thing, I mostly used classes over structs (which are used by the framework types) to allow for more code reuse.
 
-The 'hack' for capturing the underlying Task-like object is not as bad as I thought it would have to be - it originally used reflection - but the current method still relies on a 'dummy' continuation.
+The 'hack' for capturing the underlying Task-like object is not as bad as I thought it would have to be - I originally used reflection,  but I found the current method still which only relies on a 'dummy' continuation.
 
-The main oddity I have run into is that the compiler appears to treat all generic Task-like methods as if they should behave like `Task<T>` even when their builder semantics actually follow the void returning `Task` approach. This means you have to 'return' a value even though the _Task_ and awaiter have no `Result` field. I guess this isn't the intended purpose...
+The main oddity I have run into is that the compiler appears to treat all generic Task-like methods as if they should behave like `Task<T>` even when their builder semantics actually follow the void returning `Task` approach. This means you have to 'return' a value even when the _Task_ and awaiter have no `Result` field. I guess this wasn't the intended usage...
 
-I will be very curious to hear other developer's feedback. Please feel free to leave comments and feedback as issues. And of course, I welcome any pull requests for better code or more functionality.
+I will be very curious to hear other developer's feedback. Please leave comments or feedback as issues. And of course, I welcome any pull requests for better code or more functionality.
 
 
 
