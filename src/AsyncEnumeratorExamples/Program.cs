@@ -65,7 +65,7 @@ namespace AsyncEnumeratorExamples
 
         public static async Task Consumer2()
         {
-            var p = Producer2().Where(i => i % 2 == 0);
+            var p = Producer2().Where(i => i % 2 == 0); 
 
             while (await p.MoveNextAsync())
             {
