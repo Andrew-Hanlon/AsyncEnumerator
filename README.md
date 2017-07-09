@@ -52,7 +52,7 @@ public static async Task Consumer()
 ````````````
 #### AsyncSequence&lt;T&gt;
 
-While cooperative iteration is great, I believe the more common desire with async code would be to have the producer run in its own thread and simply await the availability of results (closer in concept to observables). The `AsyncSequence<T>` class shown below accomplishes this goal:
+While cooperative iteration is great, I believe the more common desire with async code would be to have the producer run in parallel and simply await the availability of results (closer in concept to observables). The `AsyncSequence<T>` class shown below accomplishes this goal:
 
 ``````````` c#
 
@@ -112,7 +112,7 @@ Producer().Subscribe(i => DoSomethingWith(i));          // Run and subscribe to 
 
 ```````````````
 
-Lastly I added a `CoopTask` class which allows a parent and child task to pass control back and forth similarly to a yielding enumerator:
+Lastly I threw in a `CoopTask` class which allows a parent and child task to pass control back and forth similarly to a yielding enumerator:
 
 ``````````` c#
 
@@ -155,9 +155,9 @@ public static async Task Parent()
 
 ## Discussion
 
-There are likely better ways of implementing most of the internals of these types. For one thing, I mostly used classes over structs (which are used by the framework types) to allow for more code reuse.
+There are likely better ways of implementing most of the internals of these types. For one thing, I largely used classes over structs (which are used by the standard framework types) to allow for more code reuse.
 
-The 'hack' for capturing the underlying Task-like object is not as bad as I thought it would have to be - I originally used reflection,  but I found the current method still which only relies on a 'dummy' continuation.
+The 'hack' for capturing the underlying Task-like object is not as bad as I thought it would have to be - I originally used reflection,  then found the current method which only relies on a 'dummy' continuation.
 
 The main oddity I have run into is that the compiler appears to treat all generic Task-like methods as if they should behave like `Task<T>` even when their builder semantics actually follow the void returning `Task` approach. This means you have to 'return' a value even when the _Task_ and awaiter have no `Result` field. I guess this wasn't the intended usage...
 
