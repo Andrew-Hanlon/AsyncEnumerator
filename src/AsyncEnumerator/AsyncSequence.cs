@@ -76,6 +76,24 @@ namespace AsyncEnumerator
             return true;
         }
 
+        /// <summary>
+        /// A quick filter method.
+        /// </summary>
+        public async AsyncSequence<T> Where(Func<T, bool> condition)
+        {
+            var seq = await AsyncSequence<T>.Capture();
+
+            while (await MoveNextAsync())
+            {
+                if(condition(Current))
+                {
+                    seq.Return(Current);
+                }
+            }
+
+            return seq.Break();
+        }
+
         internal override void SetException(ExceptionDispatchInfo exception)
         {
             _exception = exception;

@@ -98,8 +98,7 @@ namespace AsyncEnumerator
                 _methodBuilder.AwaitOnCompleted(ref awaiter, ref stateMachine);
         }
 
-        public void AwaitUnsafeOnCompleted<TAwaiter, TStateMachine>(ref TAwaiter awaiter,
-                                                                    ref TStateMachine stateMachine)
+        public void AwaitUnsafeOnCompleted<TAwaiter, TStateMachine>(ref TAwaiter awaiter, ref TStateMachine stateMachine)
             where TAwaiter : ICriticalNotifyCompletion
             where TStateMachine : IAsyncStateMachine
         {

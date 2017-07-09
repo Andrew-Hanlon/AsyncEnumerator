@@ -1,4 +1,5 @@
 ﻿using System;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Threading.Tasks;
 using AsyncEnumerator;
@@ -52,19 +53,19 @@ namespace AsyncEnumeratorExamples
         }
 
         public static async Task Consumer()
-        {            
-            var p = Producer();            
+        {
+            var p = Producer();
 
-            while (await p.MoveNextAsync())     // Await the next value 
+            while (await p.MoveNextAsync())     // Await the next value
             {
                 Console.WriteLine(p.Current);   // Use the current value
             }
         }
 
-        
+
         public static async Task Consumer2()
         {
-            var p = Producer2();
+            var p = Producer2().Where(i => i % 2 == 0);
 
             while (await p.MoveNextAsync())
             {
@@ -113,13 +114,13 @@ namespace AsyncEnumeratorExamples
 
             Console.WriteLine("P0");
 
-            await task.Yield();                           // Optionally Wait for first MoveNext call
+            await task.Yield();                           // Yield control back to parent
 
             await Task.Delay(100).ConfigureAwait(false);  // Use any async constructs
 
             Console.WriteLine("P1");
 
-            await task.Yield();                           // Yield a value and wait for MoveNext
+            await task.Yield();                           // Yield control
 
             await Task.Delay(100);
 
@@ -136,9 +137,9 @@ namespace AsyncEnumeratorExamples
 
             var i = 1;
 
-            while (await p.MoveNextAsync())          // Await the next value 
+            while (await p.MoveNextAsync())          // Await the next child operation
             {
-                Console.WriteLine("C" + i++);        // Use the current value
+                Console.WriteLine("C" + i++);
             }
         }
 
@@ -148,13 +149,13 @@ namespace AsyncEnumeratorExamples
 
             Console.WriteLine("P 0");
 
-            await task.Yield();                           // Optionally Wait for first MoveNext call
+            await task.Yield();                           // Yield control back to parent
 
             await Task.Delay(100).ConfigureAwait(false);  // Use any async constructs
 
             Console.WriteLine("P 1");
 
-            await task.Yield();                           // Yield a value and wait for MoveNext
+            await task.Yield();                           // Yield control
 
             await Task.Delay(100);
 
@@ -170,17 +171,17 @@ namespace AsyncEnumeratorExamples
             Console.WriteLine("C 0");
 
             var p = Producer5();
-            
+
             await p.MoveNextAsync();
-            
+
             Console.WriteLine("C 1");
 
             await p.MoveNextAsync();
-            
+
             Console.WriteLine("C 2");
 
             await p.MoveNextAsync();
-            
+
             Console.WriteLine("C 3");
 
             await p;
