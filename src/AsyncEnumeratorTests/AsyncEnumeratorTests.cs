@@ -8,6 +8,12 @@ namespace AsyncEnumeratorTests
     [TestClass]
     public class AsyncEnumeratorTests
     {
+        private class TestDisposable : IDisposable
+        {
+            public bool IsDisposed { get; set; }
+            public void Dispose() => IsDisposed = true;
+        }
+
         [TestMethod]
         [ExpectedException(typeof(Exception), "Awaiting failed Task did not throw.")]
         public async Task ThrowsOnMoveNext()
@@ -54,6 +60,37 @@ namespace AsyncEnumeratorTests
             Assert.IsTrue(seq.IsCompleted, "Enumeration did not complete after return.");
         }
 
+        [TestMethod]
+        public async Task HandlesDisposePattern()
+        {
+            var disposable = new TestDisposable();
+
+            using (var seq = DisposeTest(disposable))
+            {
+                await seq.MoveNextAsync();
+
+                await seq.MoveNextAsync();
+            }
+
+            Assert.IsTrue(disposable.IsDisposed);
+        }
+
+        private static async AsyncEnumerator<int> DisposeTest(TestDisposable disposable)
+        {
+            var yield = await AsyncEnumerator<int>.Capture();
+
+            using (disposable)
+            {
+                await yield.Return(1);
+
+                await yield.Return(2);
+
+                await yield.Return(3);
+            }
+
+            return yield.Break();
+        }
+
 
         private static async AsyncEnumerator<int> ExceptionTest1()
         {
@@ -88,6 +125,8 @@ namespace AsyncEnumeratorTests
 
             return yield.Break();
         }
+
+
 
     }
 }

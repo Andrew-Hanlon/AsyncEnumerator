@@ -13,7 +13,7 @@ namespace AsyncEnumerator
     }
 
     [AsyncMethodBuilder(typeof(AsyncEnumeratorMethodBuilder<>))]
-    public class AsyncEnumerator<T> : TaskLikeBase, IAsyncEnumeratorProducer<T>, IAsyncEnumerator<T>
+    public class AsyncEnumerator<T> : TaskLikeBase, IAsyncEnumeratorProducer<T>, IAsyncEnumerator<T>, IDisposable
     {
         private ExceptionDispatchInfo _exception;
 
@@ -72,7 +72,18 @@ namespace AsyncEnumerator
 
             return _yieldSource.Task;
         }
+
+        public void Dispose()
+        {
+
+            if (_yieldSource == null || !_yieldSource.Task.IsCompleted)
+            {
+                _yieldSource?.TrySetException(new AbandonedAsyncEnumeratorException());
+            }
+        }
     }
+
+    internal class AbandonedAsyncEnumeratorException : Exception { }
 
     public class AsyncEnumeratorMethodBuilder<T>
     {
