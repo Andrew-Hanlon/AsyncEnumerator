@@ -120,34 +120,34 @@ public static async CoopTask Child()
 {
     var task = await CoopTask.Capture();          // Capture the underlying 'Task'
 
-    Console.WriteLine("P0");
+    Console.WriteLine("C0");
 
     await task.Yield();                           // Yield control back to parent
 
     await Task.Delay(100).ConfigureAwait(false);  // Use any async constructs
 
-    Console.WriteLine("P1");
+    Console.WriteLine("C1");
 
     await task.Yield();                           // Yield control
 
     await Task.Delay(100);
 
-    Console.WriteLine("P2");
+    Console.WriteLine("C2");
 
     await task.Break();                           // Mark the task as completed
 
-    Console.WriteLine("P3");                      // Will not be run.
+    Console.WriteLine("C3");                      // Will not be run.
 }
 
 public static async Task Parent()
 {
-    var p = Child();
+    var c = Child();
 
     var i = 1;
 
-    while (await p.MoveNextAsync())          // Await the next child operation
+    while (await c.MoveNextAsync())          // Await the next child operation
     {
-        Console.WriteLine("C" + i++);        
+        Console.WriteLine("P" + i++);        
     }
 }
 
