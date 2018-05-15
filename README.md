@@ -1,7 +1,7 @@
 # Task-like Async Enumerators
 ## _a.k.a Abusing Task-like Types in C# 7_
 
-Since async/await was first released many have craved a corresponding 'async iterator' approach that could blend both the yield and async syntaxes.
+Since async/await was first released, many have requested an 'async iterator' approach that could blend both the yield and async syntaxes.
 
 While there are several options currently available for asynchronous sequences (Rx Observables, DataFlow blocks), none have the concise beauty of async/await and yield iterators. 
 
