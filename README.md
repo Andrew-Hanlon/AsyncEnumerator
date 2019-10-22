@@ -1,3 +1,5 @@
+**Note** C# 8 is out now and with it `IAsyncEnumerable`. That said, this repo can still stand as an example for implementing Task-Like types. Cheers!
+
 # Task-like Async Enumerators
 ## _a.k.a Abusing Task-like Types in C# 7_
 
