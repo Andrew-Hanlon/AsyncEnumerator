@@ -54,6 +54,15 @@ namespace AsyncEnumeratorTests
             Assert.IsTrue(seq.IsCompleted, "Enumeration did not complete after return.");
         }
 
+        [TestMethod]
+        public async Task EmptyEnumeratorTest()
+        {
+            var seq = GetEmptyEnumerator();
+
+            Assert.IsFalse(await seq.MoveNextAsync(), $"Call to {nameof(seq.MoveNextAsync)} did not return false after enumeration completed.");
+
+            Assert.IsTrue(seq.IsCompleted, "Enumeration did not complete after return.");
+        }
 
         private static async AsyncEnumerator<int> ExceptionTest1()
         {
@@ -85,6 +94,13 @@ namespace AsyncEnumeratorTests
             {
                 await yield.Return(i);
             }
+
+            return yield.Break();
+        }
+
+        private static async AsyncEnumerator<int> GetEmptyEnumerator()
+        {
+            var yield = await AsyncEnumerator<int>.Capture();
 
             return yield.Break();
         }
